@@ -4,148 +4,175 @@ defmodule SevenottersPostgres.Storage do
   require Logger
 #  @behaviour Seven.Data.PersistenceBehaviour
 
+  alias SevenottersPostgres.Repo
+  alias SevenottersPostgres.Schema.{Event, Process, Snapshot}
+  import Ecto.Query
 
-  @events "events"
-  @snapshots "snapshots"
-  @processes "processes"
+  @id_regex ~r/^[A-Fa-f0-9\-]{24}$/
 
   def start_link(opts \\ []) do
-    # Mongo.start_link(opts ++ [name: __MODULE__, pool_size: @pool_size])
+    Logger.info("Persistence is PostgreSQL")
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
+
+  def init(_opts), do: {:ok, nil}
 
   @spec initialize() :: any
   def initialize(), do: nil
 
   @spec insert_event(map) :: any
-  def insert_event(value) do
-    # {:ok, _id} = Mongo.insert_one(__MODULE__, @events, value)
+  def insert_event(event) do
+    {:ok, e} = %Event{} |> Event.changeset(event) |> Repo.insert()
+    e
   end
 
-  @spec upsert_snapshot(bitstring, map) :: any
-  def upsert_snapshot(correlation_id, value) do
-    # filter = %{correlation_id: correlation_id}
-    # {:ok, _id} = Mongo.update_one(__MODULE__, @snapshots, filter, %{"$set": value}, upsert: true)
+  @spec upsert_snapshot(bitstring | atom, map) :: any
+  def upsert_snapshot(correlation_id, snapshot) when is_atom(correlation_id) do
+    correlation_id = Atom.to_string(correlation_id)
+    upsert_snapshot_by_correlation_id(correlation_id, snapshot)
+  end
+
+  def upsert_snapshot(correlation_id, snapshot) when is_bitstring(correlation_id) do
+    upsert_snapshot_by_correlation_id(correlation_id, snapshot)
+  end
+
+  defp upsert_snapshot_by_correlation_id(correlation_id, snapshot) do
+    value = %{correlation_id: correlation_id, snapshot: snapshot}
+    %Snapshot{}
+    |> Snapshot.changeset(value)
+    |> Repo.insert(on_conflict: {:replace, [:snapshot]}, conflict_target: :correlation_id, returning: true)
   end
 
   @spec upsert_process(bitstring, map) :: any
-  def upsert_process(process_id, value) do
-    # filter = %{process_id: process_id}
-    # {:ok, _id} = Mongo.update_one(__MODULE__, @processes, filter, %{"$set": value}, upsert: true)
+  def upsert_process(process_id, state) do
+    value = %{process_id: process_id, status: state.status, state: state}
+    %Process{}
+    |> Process.changeset(value)
+    |> Repo.insert(on_conflict: {:replace, [:state]}, conflict_target: :process_id, returning: true)
   end
 
-  @spec get_snapshot(bitstring) :: map | nil
-  def get_snapshot(correlation_id) do
-    # Mongo.find_one(__MODULE__, @snapshots, %{correlation_id: correlation_id})
-    # |> atomize()
+  @spec get_snapshot(bitstring | atom) :: map | nil
+  def get_snapshot(correlation_id) when is_atom(correlation_id) do
+    correlation_id = Atom.to_string(correlation_id)
+    get_snapshot_by_correlation_id(correlation_id)
+  end
+
+  def get_snapshot(correlation_id) when is_bitstring(correlation_id) do
+    get_snapshot_by_correlation_id(correlation_id)
+  end
+
+  defp get_snapshot_by_correlation_id(correlation_id) do
+    case Repo.get_by(Snapshot, correlation_id: correlation_id) do
+      nil -> nil
+      %{snapshot: snapshot} -> snapshot |> atomize()
+    end
   end
 
   @spec get_process(bitstring) :: map | nil
   def get_process(process_id) do
-    # Mongo.find_one(__MODULE__, @processes, %{process_id: process_id})
-    # |> atomize()
+    case Repo.get_by(Process, process_id: process_id) do
+      nil -> nil
+      %{state: state} -> state |> atomize()
+    end
   end
 
-  # defp atomize(nil), do: nil
-  # defp atomize(entities) when is_list(entities), do: entities |> Enum.map(fn s -> AtomicMap.convert(s, safe: false) end)
-  # defp atomize(entity), do: AtomicMap.convert(entity, safe: false)
-
   @spec new_id :: any
-  def new_id, do: nil # Mongo.object_id()
+  def new_id, do: UUID.uuid4()
 
   @spec new_printable_id :: bitstring
-  def new_printable_id, do: nil # Mongo.object_id() |> BSON.ObjectId.encode!()
+  def new_printable_id, do: new_id()
 
   @spec printable_id(any) :: bitstring
-  # def printable_id(%BSON.ObjectId{} = id), do: BSON.ObjectId.encode!(id)
   def printable_id(id) when is_bitstring(id), do: id
 
   @spec object_id(bitstring) :: any
-  def object_id(id) do
-    # {_, bin} = Base.decode16(id, case: :mixed)
-    # %BSON.ObjectId{value: bin}
-  end
+  def object_id(id), do: id
 
   @spec is_valid_id?(any) :: boolean
-  def is_valid_id?(id), do: nil
-  # def is_valid_id?(%BSON.ObjectId{} = id),
-  #   do: Regex.match?(@bson_value_format, BSON.ObjectId.encode!(id))
+  def is_valid_id?(id) when is_bitstring(id), do: Regex.match?(@id_regex, id)
 
   @spec max_counter_in_events() :: integer
   def max_counter_in_events() do
-    # Mongo.find(
-    #   __MODULE__,
-    #   @events,
-    #   %{},
-    #   sort: %{:counter => -1},
-    #   limit: 1
-    # )
-    # |> Enum.to_list()
-    # |> calculate_max(Atom.to_string(:counter))
+    Event |> Repo.aggregate(:max, :counter) |> calculate_max()
   end
 
   @spec events() :: [map]
   def events() do
-    # Mongo.find(__MODULE__, @events, %{}, sort: %{}) # TODO: streaming with cursor?
-    # |> Enum.to_list()
+    Event |> Repo.all()
   end
 
   @spec snapshots() :: [map]
   def snapshots() do
-    # Mongo.find(__MODULE__, @snapshots, %{}, sort: %{}) # TODO: streaming with cursor?
-    # |> Enum.to_list()
-    # |> atomize()
+    Snapshot |> Repo.all() |> atomize()
   end
 
   @spec processes() :: [map]
   def processes() do
-    # Mongo.find(__MODULE__, @processes, %{}, sort: %{}) # TODO: streaming with cursor?
-    # |> Enum.to_list()
-    # |> atomize()
+    Process |> Repo.all()
   end
 
   @spec events_by_correlation_id(bitstring, integer) :: [map]
   def events_by_correlation_id(correlation_id, after_counter) do
-    # Mongo.find(__MODULE__, @events, %{correlation_id: correlation_id, counter: %{"$gt" => after_counter}}, sort: %{counter: 1})
-    # |> Enum.to_list()
+    q = from e in Event,
+        where: e.correlation_id == ^correlation_id and e.counter > ^after_counter,
+        order_by: [asc: :counter]
+    Repo.all(q) |> atomize()
   end
 
   @spec event_by_id(bitstring) :: map
   def event_by_id(id) do
-    # Mongo.find_one(__MODULE__, @events, %{id: id}) |> atomize()
+    Repo.get(Event, id) |> atomize()
   end
 
   @spec events_by_types([bitstring], integer) :: [map]
   def events_by_types(types, after_counter) do
-    # Mongo.find(__MODULE__, @events, %{type: %{"$in" => types}, counter: %{"$gt" => after_counter}}, sort: %{counter: 1})
-    # |> Enum.to_list()
+    q = from e in Event,
+        where: e.type in ^types and e.counter > ^after_counter,
+        order_by: [asc: :counter]
+    Repo.all(q) |> atomize()
   end
 
   @spec drop_events() :: any
   def drop_events() do
-    # Mongo.command(__MODULE__, %{:drop => @events}, pool: DBConnection.Poolboy)
+    unless Mix.env() == :prod do
+      Repo.delete_all(Event)
+    end
   end
 
   @spec drop_snapshots() :: any
   def drop_snapshots() do
-    # Mongo.command(__MODULE__, %{:drop => @snapshots}, pool: DBConnection.Poolboy)
+    unless Mix.env() == :prod do
+      Repo.delete_all(Snapshot)
+    end
   end
 
   @spec drop_processes() :: any
   def drop_processes() do
-    # Mongo.command(__MODULE__, %{:drop => @processes}, pool: DBConnection.Poolboy)
+    unless Mix.env() == :prod do
+      Repo.delete_all(Process)
+    end
   end
 
   @callback processes_id_by_status(bitstring) :: [map]
   def processes_id_by_status(status) do
-    # Mongo.find(__MODULE__, @processes, %{status: status}, projection: %{process_id: 1})
-    # |> Enum.to_list()
-    # |> Enum.map(fn p -> p["process_id"] end)
+    q = from p in Process,
+        where: p.status == ^status,
+        select: p.process_id
+    Repo.all(q)
   end
 
   #
   # Privates
   #
-  # @spec calculate_max([map], bitstring) :: integer
-  # defp calculate_max([], _field), do: 0
-  # defp calculate_max([e], field), do: e[field]
+
+  defp to_map(entity) when is_struct(entity), do: entity |> Map.from_struct() |> Map.delete(:__meta__)
+  defp to_map(entity) when is_map(entity), do: entity
+
+  defp atomize(nil), do: nil
+  defp atomize(entities) when is_list(entities), do: entities |> Enum.map(fn s -> atomize(s) end)
+  defp atomize(entity), do: entity |> to_map() |>AtomicMap.convert(safe: false)
+
+  @spec calculate_max(integer | nil) :: integer
+  defp calculate_max(nil), do: 0
+  defp calculate_max(v), do: v
 end

@@ -24,7 +24,8 @@ defmodule SevenottersPostgres.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger],
+      mod: {SevenottersPostgres.Application, []}
     ]
   end
 
@@ -48,7 +49,11 @@ defmodule SevenottersPostgres.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:ecto_sql, "~> 3.4"},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
+      {:jason, "~> 1.2"},
+      {:postgrex, "~> 0.15"},
+      {:uuid, "~> 1.1.8"}
     ]
   end
 end
