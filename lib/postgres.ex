@@ -97,39 +97,31 @@ defmodule SevenottersPostgres.Storage do
   end
 
   @spec events() :: [map]
-  def events() do
-    Event |> Repo.all()
-  end
+  def events(), do: Repo.all(Event)
 
   @spec snapshots() :: [map]
-  def snapshots() do
-    Snapshot |> Repo.all() |> atomize()
-  end
+  def snapshots(), do: Repo.all(Snapshot) |> atomize()
 
   @spec processes() :: [map]
-  def processes() do
-    Process |> Repo.all()
-  end
+  def processes(), do: Repo.all(Process)
 
   @spec events_by_correlation_id(bitstring, integer) :: [map]
   def events_by_correlation_id(correlation_id, after_counter) do
     q = from e in Event,
         where: e.correlation_id == ^correlation_id and e.counter > ^after_counter,
         order_by: [asc: :counter]
-    Repo.all(q) |> atomize()
+    Repo.stream(q)
   end
 
   @spec event_by_id(bitstring) :: map
-  def event_by_id(id) do
-    Repo.get(Event, id) |> atomize()
-  end
+  def event_by_id(id), do: Repo.get(Event, id) |> atomize()
 
-  @spec events_by_types([bitstring], integer) :: [map]
+  @spec events_by_types([bitstring], integer) :: any
   def events_by_types(types, after_counter) do
     q = from e in Event,
         where: e.type in ^types and e.counter > ^after_counter,
         order_by: [asc: :counter]
-    Repo.all(q) |> atomize()
+    Repo.stream(q)
   end
 
   @spec drop_events() :: any
@@ -159,6 +151,12 @@ defmodule SevenottersPostgres.Storage do
         where: p.status == ^status,
         select: p.process_id
     Repo.all(q)
+  end
+
+  @callback stream_to_list(any) :: [map]
+  def stream_to_list(stream) do
+    {:ok, items} = Repo.transaction(fn -> Enum.to_list(stream) end)
+    items |> atomize()
   end
 
   #
