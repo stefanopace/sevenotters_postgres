@@ -10,7 +10,7 @@ defmodule SevenottersPostgres.Repo.Migrations.CreateEvents   do
       add :counter, :bigint, null: false
       add :request_id, :string, null: true
       add :process_id, :string, null: true
-      add :correlation_id, :string, null: false
+      add :correlation_id, :string, null: true
       add :correlation_module, :string, null: false
       add :date, :naive_datetime, null: false
       add :payload, :json, null: false, default: "{}"
