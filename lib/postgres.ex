@@ -105,12 +105,11 @@ defmodule SevenottersPostgres.Storage do
   @spec processes() :: [map]
   def processes(), do: Repo.all(Process)
 
-  @spec events_by_correlation_id(bitstring, integer) :: [map]
+  @spec events_by_correlation_id(bitstring, integer) :: any
   def events_by_correlation_id(correlation_id, after_counter) do
-    q = from e in Event,
+    from e in Event,
         where: e.correlation_id == ^correlation_id and e.counter > ^after_counter,
         order_by: [asc: :counter]
-    Repo.stream(q)
   end
 
   @spec event_by_id(bitstring) :: map
@@ -118,10 +117,9 @@ defmodule SevenottersPostgres.Storage do
 
   @spec events_by_types([bitstring], integer) :: any
   def events_by_types(types, after_counter) do
-    q = from e in Event,
+    from e in Event,
         where: e.type in ^types and e.counter > ^after_counter,
         order_by: [asc: :counter]
-    Repo.stream(q)
   end
 
   @spec drop_events() :: any
@@ -145,7 +143,7 @@ defmodule SevenottersPostgres.Storage do
     end
   end
 
-  @callback processes_id_by_status(bitstring) :: [map]
+  @callback processes_id_by_status(bitstring) :: any
   def processes_id_by_status(status) do
     q = from p in Process,
         where: p.status == ^status,
@@ -155,8 +153,7 @@ defmodule SevenottersPostgres.Storage do
 
   @callback stream_to_list(any) :: [map]
   def stream_to_list(stream) do
-    {:ok, items} = Repo.transaction(fn -> Enum.to_list(stream) end)
-    items |> atomize()
+    Repo.all(stream) |> atomize()
   end
 
   #
@@ -168,7 +165,7 @@ defmodule SevenottersPostgres.Storage do
 
   defp atomize(nil), do: nil
   defp atomize(entities) when is_list(entities), do: entities |> Enum.map(fn s -> atomize(s) end)
-  defp atomize(entity), do: entity |> to_map() |>AtomicMap.convert(safe: false)
+  defp atomize(entity), do: entity |> to_map() |> AtomicMap.convert(safe: false)
 
   @spec calculate_max(integer | nil) :: integer
   defp calculate_max(nil), do: 0
