@@ -2,7 +2,7 @@ defmodule SevenottersPostgres.Storage do
   @moduledoc false
 
   require Logger
-#  @behaviour Seven.Data.PersistenceBehaviour
+  #  @behaviour Seven.Data.PersistenceBehaviour
 
   alias SevenottersPostgres.Repo
   alias SevenottersPostgres.Schema.{Event, Process, Snapshot}
@@ -38,17 +38,27 @@ defmodule SevenottersPostgres.Storage do
 
   defp upsert_snapshot_by_correlation_id(correlation_id, snapshot) do
     value = %{correlation_id: correlation_id, snapshot: snapshot}
+
     %Snapshot{}
     |> Snapshot.changeset(value)
-    |> Repo.insert(on_conflict: {:replace, [:snapshot]}, conflict_target: :correlation_id, returning: true)
+    |> Repo.insert(
+      on_conflict: {:replace, [:snapshot]},
+      conflict_target: :correlation_id,
+      returning: true
+    )
   end
 
   @spec upsert_process(bitstring, map) :: any
   def upsert_process(process_id, state) do
     value = %{process_id: process_id, status: state.status, state: state}
+
     %Process{}
     |> Process.changeset(value)
-    |> Repo.insert(on_conflict: {:replace, [:state]}, conflict_target: :process_id, returning: true)
+    |> Repo.insert(
+      on_conflict: {:replace, [:state]},
+      conflict_target: :process_id,
+      returning: true
+    )
   end
 
   @spec get_snapshot(bitstring | atom) :: map | nil
@@ -107,9 +117,10 @@ defmodule SevenottersPostgres.Storage do
 
   @spec events_by_correlation_id(bitstring, integer) :: any
   def events_by_correlation_id(correlation_id, after_counter) do
-    from e in Event,
-        where: e.correlation_id == ^correlation_id and e.counter > ^after_counter,
-        order_by: [asc: :counter]
+    from(e in Event,
+      where: e.correlation_id == ^correlation_id and e.counter > ^after_counter,
+      order_by: [asc: :counter]
+    )
   end
 
   @spec event_by_id(bitstring) :: map
@@ -117,9 +128,10 @@ defmodule SevenottersPostgres.Storage do
 
   @spec events_by_types([bitstring], integer) :: any
   def events_by_types(types, after_counter) do
-    from e in Event,
-        where: e.type in ^types and e.counter > ^after_counter,
-        order_by: [asc: :counter]
+    from(e in Event,
+      where: e.type in ^types and e.counter > ^after_counter,
+      order_by: [asc: :counter]
+    )
   end
 
   @spec drop_events() :: any
@@ -145,9 +157,12 @@ defmodule SevenottersPostgres.Storage do
 
   @callback processes_id_by_status(bitstring) :: any
   def processes_id_by_status(status) do
-    q = from p in Process,
+    q =
+      from(p in Process,
         where: p.status == ^status,
         select: p.process_id
+      )
+
     Repo.all(q)
   end
 
@@ -160,7 +175,9 @@ defmodule SevenottersPostgres.Storage do
   # Privates
   #
 
-  defp to_map(entity) when is_struct(entity), do: entity |> Map.from_struct() |> Map.delete(:__meta__)
+  defp to_map(entity) when is_struct(entity),
+    do: entity |> Map.from_struct() |> Map.delete(:__meta__)
+
   defp to_map(entity) when is_map(entity), do: entity
 
   defp atomize(nil), do: nil

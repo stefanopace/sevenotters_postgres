@@ -21,7 +21,16 @@ defmodule SevenottersPostgres.Schema.Event do
     field(:payload, :map)
   end
 
-  @fields [:counter, :type, :request_id, :process_id, :correlation_id, :correlation_module, :date, :payload]
+  @fields [
+    :counter,
+    :type,
+    :request_id,
+    :process_id,
+    :correlation_id,
+    :correlation_module,
+    :date,
+    :payload
+  ]
   @required [:counter, :type, :request_id, :correlation_module, :date, :payload]
 
   @spec changeset(map, map) :: Ecto.Changeset.t()
