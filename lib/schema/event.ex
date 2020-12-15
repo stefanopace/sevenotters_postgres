@@ -7,12 +7,12 @@ defmodule SevenottersPostgres.Schema.Event do
 
   import Ecto.Changeset
 
-  @primary_key {:id, :binary_id, autogenerate: false}
   @type t :: __MODULE__
 
+  @primary_key false
   schema "events" do
+    field(:counter, :integer, primary_key: true)
     field(:type, :string)
-    field(:counter, :integer)
     field(:request_id, :string)
     field(:process_id, :string)
     field(:correlation_id, :string)
@@ -21,8 +21,8 @@ defmodule SevenottersPostgres.Schema.Event do
     field(:payload, :map)
   end
 
-  @fields [:id, :type, :counter, :request_id, :process_id, :correlation_id, :correlation_module, :date, :payload]
-  @required [:id, :type, :counter, :request_id, :correlation_module, :date, :payload]
+  @fields [:counter, :type, :request_id, :process_id, :correlation_id, :correlation_module, :date, :payload]
+  @required [:counter, :type, :request_id, :correlation_module, :date, :payload]
 
   @spec changeset(map, map) :: Ecto.Changeset.t()
   def changeset(event, attributes \\ %{}) do

@@ -5,9 +5,8 @@ defmodule SevenottersPostgres.Repo.Migrations.CreateEvents   do
 
   def up do
     create table(@table, primary_key: false) do
-      add :id, :uuid, primary_key: true
+      add :counter, :bigint, primary_key: true
       add :type, :string, null: false
-      add :counter, :bigint, null: false
       add :request_id, :string, null: true
       add :process_id, :string, null: true
       add :correlation_id, :string, null: true
@@ -16,7 +15,8 @@ defmodule SevenottersPostgres.Repo.Migrations.CreateEvents   do
       add :payload, :json, null: false, default: "{}"
     end
 
-    create index(@table, [:type])
+    create unique_index(@table, [:type, :counter])
+    create unique_index(@table, [:correlation_id, :counter])
   end
 
   def down do
