@@ -5,7 +5,7 @@ defmodule SevenottersPostgres.Storage do
   #  @behaviour Seven.Data.PersistenceBehaviour
 
   alias SevenottersPostgres.Repo
-  alias SevenottersPostgres.Schema.{Event, Process, Snapshot}
+  alias SevenottersPostgres.Schema.{Event, Process}
   import Ecto.Query
 
   @id_regex ~r/^[A-Fa-f0-9\-]{24}$/
@@ -26,28 +26,6 @@ defmodule SevenottersPostgres.Storage do
     e
   end
 
-  @spec upsert_snapshot(bitstring | atom, map) :: any
-  def upsert_snapshot(correlation_id, snapshot) when is_atom(correlation_id) do
-    correlation_id = Atom.to_string(correlation_id)
-    upsert_snapshot_by_correlation_id(correlation_id, snapshot)
-  end
-
-  def upsert_snapshot(correlation_id, snapshot) when is_bitstring(correlation_id) do
-    upsert_snapshot_by_correlation_id(correlation_id, snapshot)
-  end
-
-  defp upsert_snapshot_by_correlation_id(correlation_id, snapshot) do
-    value = %{correlation_id: correlation_id, snapshot: snapshot}
-
-    %Snapshot{}
-    |> Snapshot.changeset(value)
-    |> Repo.insert(
-      on_conflict: {:replace, [:snapshot]},
-      conflict_target: :correlation_id,
-      returning: true
-    )
-  end
-
   @spec upsert_process(bitstring, map) :: any
   def upsert_process(process_id, state) do
     value = %{process_id: process_id, status: state.status, state: state}
@@ -59,23 +37,6 @@ defmodule SevenottersPostgres.Storage do
       conflict_target: :process_id,
       returning: true
     )
-  end
-
-  @spec get_snapshot(bitstring | atom) :: map | nil
-  def get_snapshot(correlation_id) when is_atom(correlation_id) do
-    correlation_id = Atom.to_string(correlation_id)
-    get_snapshot_by_correlation_id(correlation_id)
-  end
-
-  def get_snapshot(correlation_id) when is_bitstring(correlation_id) do
-    get_snapshot_by_correlation_id(correlation_id)
-  end
-
-  defp get_snapshot_by_correlation_id(correlation_id) do
-    case Repo.get_by(Snapshot, correlation_id: correlation_id) do
-      nil -> nil
-      %{snapshot: snapshot} -> snapshot |> atomize()
-    end
   end
 
   @spec get_process(bitstring) :: map | nil
@@ -109,9 +70,6 @@ defmodule SevenottersPostgres.Storage do
   @spec events() :: [map]
   def events(), do: Repo.all(Event)
 
-  @spec snapshots() :: [map]
-  def snapshots(), do: Repo.all(Snapshot) |> atomize()
-
   @spec processes() :: [map]
   def processes(), do: Repo.all(Process)
 
@@ -138,13 +96,6 @@ defmodule SevenottersPostgres.Storage do
   def drop_events() do
     unless Mix.env() == :prod do
       Repo.delete_all(Event)
-    end
-  end
-
-  @spec drop_snapshots() :: any
-  def drop_snapshots() do
-    unless Mix.env() == :prod do
-      Repo.delete_all(Snapshot)
     end
   end
 
