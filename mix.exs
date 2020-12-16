@@ -54,7 +54,7 @@ defmodule SevenottersPostgres.MixProject do
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:jason, "~> 1.2"},
       {:postgrex, "~> 0.15"},
-      {:uuid, "~> 1.1.8"},
+      {:uuid, "~> 1.1.8"}
     ]
   end
 end
