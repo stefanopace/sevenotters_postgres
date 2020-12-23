@@ -2,10 +2,10 @@ defmodule SevenottersPostgres.Storage do
   @moduledoc false
 
   require Logger
-#  @behaviour Seven.Data.PersistenceBehaviour
+  #  @behaviour Seven.Data.PersistenceBehaviour
 
   alias SevenottersPostgres.Repo
-  alias SevenottersPostgres.Schema.{Event, Process, Snapshot}
+  alias SevenottersPostgres.Schema.{Event, Process}
   import Ecto.Query
 
   @id_regex ~r/^[A-Fa-f0-9\-]{24}$/
@@ -26,46 +26,17 @@ defmodule SevenottersPostgres.Storage do
     e
   end
 
-  @spec upsert_snapshot(bitstring | atom, map) :: any
-  def upsert_snapshot(correlation_id, snapshot) when is_atom(correlation_id) do
-    correlation_id = Atom.to_string(correlation_id)
-    upsert_snapshot_by_correlation_id(correlation_id, snapshot)
-  end
-
-  def upsert_snapshot(correlation_id, snapshot) when is_bitstring(correlation_id) do
-    upsert_snapshot_by_correlation_id(correlation_id, snapshot)
-  end
-
-  defp upsert_snapshot_by_correlation_id(correlation_id, snapshot) do
-    value = %{correlation_id: correlation_id, snapshot: snapshot}
-    %Snapshot{}
-    |> Snapshot.changeset(value)
-    |> Repo.insert(on_conflict: {:replace, [:snapshot]}, conflict_target: :correlation_id, returning: true)
-  end
-
   @spec upsert_process(bitstring, map) :: any
   def upsert_process(process_id, state) do
     value = %{process_id: process_id, status: state.status, state: state}
+
     %Process{}
     |> Process.changeset(value)
-    |> Repo.insert(on_conflict: {:replace, [:state]}, conflict_target: :process_id, returning: true)
-  end
-
-  @spec get_snapshot(bitstring | atom) :: map | nil
-  def get_snapshot(correlation_id) when is_atom(correlation_id) do
-    correlation_id = Atom.to_string(correlation_id)
-    get_snapshot_by_correlation_id(correlation_id)
-  end
-
-  def get_snapshot(correlation_id) when is_bitstring(correlation_id) do
-    get_snapshot_by_correlation_id(correlation_id)
-  end
-
-  defp get_snapshot_by_correlation_id(correlation_id) do
-    case Repo.get_by(Snapshot, correlation_id: correlation_id) do
-      nil -> nil
-      %{snapshot: snapshot} -> snapshot |> atomize()
-    end
+    |> Repo.insert(
+      on_conflict: {:replace, [:state]},
+      conflict_target: :process_id,
+      returning: true
+    )
   end
 
   @spec get_process(bitstring) :: map | nil
@@ -99,17 +70,15 @@ defmodule SevenottersPostgres.Storage do
   @spec events() :: [map]
   def events(), do: Repo.all(Event)
 
-  @spec snapshots() :: [map]
-  def snapshots(), do: Repo.all(Snapshot) |> atomize()
-
   @spec processes() :: [map]
   def processes(), do: Repo.all(Process)
 
   @spec events_by_correlation_id(bitstring, integer) :: any
   def events_by_correlation_id(correlation_id, after_counter) do
-    from e in Event,
-        where: e.correlation_id == ^correlation_id and e.counter > ^after_counter,
-        order_by: [asc: :counter]
+    from(e in Event,
+      where: e.correlation_id == ^correlation_id and e.counter > ^after_counter,
+      order_by: [asc: :counter]
+    )
   end
 
   @spec event_by_id(bitstring) :: map
@@ -117,22 +86,16 @@ defmodule SevenottersPostgres.Storage do
 
   @spec events_by_types([bitstring], integer) :: any
   def events_by_types(types, after_counter) do
-    from e in Event,
-        where: e.type in ^types and e.counter > ^after_counter,
-        order_by: [asc: :counter]
+    from(e in Event,
+      where: e.type in ^types and e.counter > ^after_counter,
+      order_by: [asc: :counter]
+    )
   end
 
   @spec drop_events() :: any
   def drop_events() do
     unless Mix.env() == :prod do
       Repo.delete_all(Event)
-    end
-  end
-
-  @spec drop_snapshots() :: any
-  def drop_snapshots() do
-    unless Mix.env() == :prod do
-      Repo.delete_all(Snapshot)
     end
   end
 
@@ -145,9 +108,12 @@ defmodule SevenottersPostgres.Storage do
 
   @callback processes_id_by_status(bitstring) :: any
   def processes_id_by_status(status) do
-    q = from p in Process,
+    q =
+      from(p in Process,
         where: p.status == ^status,
         select: p.process_id
+      )
+
     Repo.all(q)
   end
 
@@ -160,7 +126,9 @@ defmodule SevenottersPostgres.Storage do
   # Privates
   #
 
-  defp to_map(entity) when is_struct(entity), do: entity |> Map.from_struct() |> Map.delete(:__meta__)
+  defp to_map(entity) when is_struct(entity),
+    do: entity |> Map.from_struct() |> Map.delete(:__meta__)
+
   defp to_map(entity) when is_map(entity), do: entity
 
   defp atomize(nil), do: nil
