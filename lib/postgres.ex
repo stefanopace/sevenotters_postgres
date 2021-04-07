@@ -33,7 +33,7 @@ defmodule SevenottersPostgres.Storage do
     %Process{}
     |> Process.changeset(value)
     |> Repo.insert(
-      on_conflict: {:replace, [:state]},
+      on_conflict: {:replace, [:status, :state]},
       conflict_target: :process_id,
       returning: true
     )
