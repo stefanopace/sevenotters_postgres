@@ -117,9 +117,15 @@ defmodule SevenottersPostgres.Storage do
     Repo.all(q)
   end
 
-  @callback stream_to_list(any) :: [map]
-  def stream_to_list(stream) do
-    Repo.all(stream) |> atomize()
+  def events_reduce(stream, acc, fun) do
+    {:ok, value} = Repo.transaction(fn ->
+      stream
+      |> Repo.stream()
+      |> Stream.map(&atomize/1)
+      |> Enum.reduce(acc, fun)
+    end, timeout: :infinity)
+
+    value
   end
 
   #
@@ -131,8 +137,6 @@ defmodule SevenottersPostgres.Storage do
 
   defp to_map(entity) when is_map(entity), do: entity
 
-  defp atomize(nil), do: nil
-  defp atomize(entities) when is_list(entities), do: entities |> Enum.map(fn s -> atomize(s) end)
   defp atomize(entity), do: entity |> to_map() |> AtomicMap.convert(safe: false)
 
   @spec calculate_max(integer | nil) :: integer
