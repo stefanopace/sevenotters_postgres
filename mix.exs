@@ -4,7 +4,7 @@ defmodule SevenottersPostgres.MixProject do
   def project do
     [
       app: :sevenotters_postgres,
-      version: "0.1.0",
+      version: "0.2.0",
       elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -13,7 +13,6 @@ defmodule SevenottersPostgres.MixProject do
       name: "Seven Otters PostgreSQL support",
       source_url: "https://github.com/sevenotters",
       homepage_url: "https://www.sevenotters.org",
-      docs: docs(),
 
       # Package
       description: "PostgreSQL persistence support for Seven Otters.",
@@ -26,14 +25,6 @@ defmodule SevenottersPostgres.MixProject do
     [
       extra_applications: [:logger],
       mod: {SevenottersPostgres.Application, []}
-    ]
-  end
-
-  defp docs do
-    [
-      main: "getting_started",
-      logo: "markdown/icon.png",
-      extras: ["markdown/getting_started.md"]
     ]
   end
 
