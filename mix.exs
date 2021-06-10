@@ -4,7 +4,7 @@ defmodule SevenottersPostgres.MixProject do
   def project do
     [
       app: :sevenotters_postgres,
-      version: "0.2.0",
+      version: "0.2.1",
       elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -30,7 +30,7 @@ defmodule SevenottersPostgres.MixProject do
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README*", "LICENSE*"],
+      files: ["lib", "priv", "mix.exs", "README*", "LICENSE*"],
       maintainers: ["Nicola Fiorillo"],
       licenses: ["MIT"],
       links: %{"GitHub" => "https://github.com/sevenotters/sevenotters_postgres"}
