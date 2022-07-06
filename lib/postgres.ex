@@ -5,7 +5,7 @@ defmodule SevenottersPostgres.Storage do
   #  @behaviour Seven.Data.PersistenceBehaviour
 
   alias SevenottersPostgres.Repo
-  alias SevenottersPostgres.Schema.{Event, Process}
+  alias SevenottersPostgres.Schema.{Event, Process, Service}
   import Ecto.Query
 
   @id_regex ~r/^[A-Fa-f0-9\-]{24}$/
@@ -39,9 +39,30 @@ defmodule SevenottersPostgres.Storage do
     )
   end
 
+  @spec upsert_service(bitstring, map) :: any
+  def upsert_service(server_name, state) do
+    value = %{server_name: server_name, state: state}
+
+    %Service{}
+    |> Service.changeset(value)
+    |> Repo.insert(
+      on_conflict: {:replace, [:state]},
+      conflict_target: :server_name,
+      returning: true
+    )
+  end
+
   @spec get_process(bitstring) :: map | nil
   def get_process(process_id) do
     case Repo.get_by(Process, process_id: process_id) do
+      nil -> nil
+      %{state: state} -> state |> atomize()
+    end
+  end
+
+  @spec get_service(bitstring) :: map | nil
+  def get_service(server_name) do
+    case Repo.get_by(Service, server_name: server_name) do
       nil -> nil
       %{state: state} -> state |> atomize()
     end
@@ -118,12 +139,16 @@ defmodule SevenottersPostgres.Storage do
   end
 
   def events_reduce(stream, acc, fun) do
-    {:ok, value} = Repo.transaction(fn ->
-      stream
-      |> Repo.stream()
-      |> Stream.map(&atomize/1)
-      |> Enum.reduce(acc, fun)
-    end, timeout: :infinity)
+    {:ok, value} =
+      Repo.transaction(
+        fn ->
+          stream
+          |> Repo.stream()
+          |> Stream.map(&atomize/1)
+          |> Enum.reduce(acc, fun)
+        end,
+        timeout: :infinity
+      )
 
     value
   end
